@@ -13,7 +13,7 @@ class ASA:
         self.hay_errores = False
         self.preanalisis = tokens[self.i]
         self.tokens = tokens
-        
+
         # Definición de reglas
         self.regla0 = ["Q", "select", "D", "from", "T"]
         self.regla1 = ["D", "distinct", "P"]
@@ -95,7 +95,83 @@ class ASA:
         self.tabla[4][16] = Celda(["24"])
         self.tabla[24][4] = Celda(["r", "12"])
         self.tabla[24][7] = Celda(["r", "12"])
-        
+
+    """
+        **Algoritmo pagina 251 del libro**
+
+        hacer que a sea el primer símbolo de w$;
+
+        while(1) { /* repetir indefinidamente */
+            hacer que s sea el estado en la parte superior de la pila;
+
+            if ( ACCION[s, a] = desplazar t ) {
+                meter t en la pila;
+                hacer que a sea el siguiente símbolo de entrada;
+            } else if ( ACCION[s, a] = reducir A → β ) {
+                sacar |β| símbolos de la pila;
+                hacer que el estado t ahora esté en la parte superior de la pila;
+                meter ir_A[t, A] en la pila;
+                enviar de salida la producción A → β;
+            } else if ( ACCION[s, a] = aceptar ) break; /* terminó el análisis sintáctico */
+
+            else llamar a la rutina de recuperación de errores;
+
+        }
+        """
+
+    def parse(self):
+        # La pila se utiliza para realizar el seguimiento de los estados del autómata, 
+        # a representa el símbolo de entrada y s es el estado actual.
+        pila = []
+        a = self.preanalisis.buscar()
+        s = 0
+
+        while True:
+            if pila:
+                #se establece el estado s en la parte superior de la pila. 
+                s = pila[-1]
+            else:
+                # Si la pila está vacía, se coloca el estado inicial en la pila.
+                pila.append(s)
+
+            if self.tabla[s][a] is not None and self.tabla[s][a].contenido[0] == "s":  
+                # Manejo de Desplazamientos
+                # Si la entrada y el estado actual tienen una acción de desplazamiento (s), 
+                # se agrega el nuevo estado a la pila, se avanza a la siguiente entrada y se actualiza a.
+                pila.append(int(self.tabla[s][a].contenido[1]))
+                self.i += 1
+                self.preanalisis = self.tokens[self.i]
+                a = self.preanalisis.buscar()
+
+            elif self.tabla[s][a] is not None and self.tabla[s][a].contenido[0] == "r":  
+                # Manejo de Reducciones
+                # Si la entrada y el estado actual tienen una acción de reducción (r), 
+                # se realiza la reducción utilizando la producción correspondiente y se actualiza el estado en la cima de la pila.
+                produccion = self.reducciones(self.tabla[s][a].contenido[1])
+
+                tam = len(produccion) - 1
+                A = produccion[0]
+
+                for _ in range(tam):
+                    pila.pop()
+                
+                pila.append(int(self.tabla[pila[-1]][self.buscar(A)].contenido[0]))
+                
+            elif self.tabla[s][a] is not None and self.tabla[s][a].contenido[0] == "acc":
+                # Si la entrada y el estado actual tienen una acción de aceptación (acc), 
+                # el análisis sintáctico ha tenido éxito y se sale del bucle.
+                break
+            else:
+                self.hay_errores = True
+                break
+
+        if self.preanalisis.tipo == TipoToken.EOF and not self.hay_errores:
+            print("Consulta correcta")
+            return True
+        else:
+            print("Se encontraron errores")
+            return False
+
     def reducciones(self, aux):
       reglas = {
         "0": self.regla0,
@@ -134,50 +210,3 @@ class ASA:
         "T3": 18,
       }
       return mapeo.get(A, -1)
-  
-    def parse(self):
-        pila = []
-        a = self.preanalisis.buscar()
-        s = 0
-
-        while True:
-            if pila:
-                s = pila[-1]
-            else:
-                pila.append(s)
-
-            if self.tabla[s][a] is not None and self.tabla[s][a].contenido[0] == "s":  # Manejo de Desplazamientos
-                pila.append(int(self.tabla[s][a].contenido[1]))
-                self.i += 1
-                self.preanalisis = self.tokens[self.i]
-                a = self.preanalisis.buscar()
-            elif self.tabla[s][a] is not None and self.tabla[s][a].contenido[0] == "r":  # Manejo de Reducciones
-                produccion = self.reducciones(self.tabla[s][a].contenido[1])
-                tam = len(produccion) - 1
-                A = produccion[0]
-
-                for _ in range(tam):
-                    pila.pop()
-
-                #print(f"{self.tabla[s][a].contenido[1]}){A}->", end="")
-                #for i in range(1, tam + 1):
-                #    print(produccion[i], end="")
-                #print("")
-
-                
-                pila.append(int(self.tabla[pila[-1]][self.buscar(A)].contenido[0]))
-                
-            elif self.tabla[s][a] is not None and self.tabla[s][a].contenido[0] == "acc":
-                break
-            else:
-                self.hay_errores = True
-                break
-
-        if self.preanalisis.tipo == TipoToken.EOF and not self.hay_errores:
-            print("Consulta correcta")
-            return True
-        else:
-            print("Se encontraron errores")
-            return False
-
-        
